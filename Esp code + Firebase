@@ -1,0 +1,97 @@
+#include <FirebaseESP8266.h>
+#include <DHT.h>
+
+// Firebase and Wi-Fi configurations
+#define WIFI_SSID "Nova i3"
+#define WIFI_PASSWORD "rnm333567"
+#define DHT_SENSOR_PIN  D7
+#define DHT_SENSOR_TYPE DHT22
+
+FirebaseData firebaseData;
+FirebaseAuth auth;
+FirebaseConfig config;
+
+DHT dht_sensor(DHT_SENSOR_PIN, DHT_SENSOR_TYPE);
+
+int MQdata = A0;
+int MQresult = 0;
+int Buzzer = D1;
+int Buzzer2 = D2;
+
+void setup() {
+  Serial.begin(115200);
+
+  // Wi-Fi connection
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("Connected to Wi-Fi");
+
+  // Firebase setup
+  config.host = "chickcheck-5a2dc-default-rtdb.firebaseio.com";  // Firebase URL without "https://"
+  config.signer.tokens.legacy_token = "rKQQ07zsB9oLIylADNyEf1CvpT1EyPUrae9w4Gst";  // Firebase Authentication Token
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+
+  // Sensor setup
+  dht_sensor.begin();
+  pinMode(MQdata, INPUT);
+  pinMode(Buzzer, OUTPUT);
+  pinMode(Buzzer2, OUTPUT);
+}
+
+void loop() {
+  // Read humidity and temperature
+  float humi = dht_sensor.readHumidity();
+  float temperature_C = dht_sensor.readTemperature();
+  float temperature_F = dht_sensor.readTemperature(true);
+
+  if (isnan(temperature_C) || isnan(temperature_F) || isnan(humi)) {
+    Serial.println("Failed to read from DHT sensor!");
+  } else {
+    Serial.print("Humidity: ");
+    Serial.print(humi);
+    Serial.print("%  |  Temperature: ");
+    Serial.print(temperature_C);
+    Serial.print("°C  ~  ");
+    Serial.print(temperature_F);
+    Serial.println("°F");
+
+    // Send data to Firebase
+    if (Firebase.setFloat(firebaseData, "/sensor/temperature", temperature_C)) {
+      Serial.println("Temperature data sent successfully");
+    } else {
+      Serial.print("Failed to send temperature data: ");
+      Serial.println(firebaseData.errorReason());
+    }
+    if (Firebase.setFloat(firebaseData, "/sensor/humidity", humi)) {
+      Serial.println("Humidity data sent successfully");
+    } else {
+      Serial.print("Failed to send humidity data: ");
+      Serial.println(firebaseData.errorReason());
+    }
+  }
+
+  // Control buzzer based on temperature
+  if (temperature_C <= 32) {
+    digitalWrite(Buzzer, HIGH);
+  } else {
+    digitalWrite(Buzzer, LOW);
+  }
+
+  // Ammonia sensor
+  MQresult = analogRead(MQdata);
+  if (MQresult <= 25) {
+    digitalWrite(Buzzer2, HIGH);
+    delay(5000);
+    digitalWrite(Buzzer2, LOW);
+  }
+
+  Serial.print("Ammonia Level: ");
+  Serial.print(MQresult);
+  Serial.println(" PPM");
+
+  delay(2000);  // Adjust as needed
+}
