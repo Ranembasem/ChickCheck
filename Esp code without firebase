@@ -1,0 +1,65 @@
+#include <DHT.h>
+#define DHT_SENSOR_PIN  D7 // The ESP8266 pin D7 connected to DHT22 sensor
+#define DHT_SENSOR_TYPE DHT22
+
+DHT dht_sensor(DHT_SENSOR_PIN, DHT_SENSOR_TYPE);
+int MQdata = A0;
+int MQresult = 0;
+int Buzzer = D1;
+int Buzzer2 = D2;
+
+void setup() {
+  Serial.begin(9600);
+  dht_sensor.begin(); // Initialize the DHT sensor
+  pinMode(MQdata, INPUT);
+  pinMode(Buzzer, OUTPUT);
+  pinMode(Buzzer2, OUTPUT);
+}
+
+void loop() {
+  // Read humidity and temperature
+  float humi = dht_sensor.readHumidity();
+  float temperature_C = dht_sensor.readTemperature();
+  float temperature_F = dht_sensor.readTemperature(true);
+
+  // Check if the reading is successful
+  if (isnan(temperature_C) || isnan(temperature_F) || isnan(humi)) {
+    Serial.println("Failed to read from DHT sensor!");
+  } else {
+    Serial.print("Humidity: ");
+    Serial.print(humi);
+    Serial.print("%");
+
+    Serial.print("  |  ");
+
+    Serial.print("Temperature: ");
+    Serial.print(temperature_C);
+    Serial.print("°C  ~  ");
+    Serial.print(temperature_F);
+    Serial.println("°F");
+  }
+
+  // Control the first buzzer based on temperature
+  if (temperature_C <= 32) {
+    digitalWrite(Buzzer, HIGH);
+  } else {
+    digitalWrite(Buzzer, LOW);
+  }
+
+  // Read the ammonia sensor
+  MQresult = analogRead(MQdata);
+  
+  // Control the second buzzer based on ammonia level
+  if (MQresult <= 25) {
+    digitalWrite(Buzzer2, HIGH);
+    delay(5000); // Buzzer stays on for 5 seconds
+    digitalWrite(Buzzer2, LOW);
+  }
+
+  Serial.print("Ammonia Level: ");
+  Serial.print(MQresult); // Display the ammonia sensor reading
+  Serial.println(" PPM");
+
+  // Wait 1 second between readings
+  delay(1000);
+}
